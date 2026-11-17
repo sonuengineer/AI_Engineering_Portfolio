@@ -46,6 +46,8 @@ Demo logins use the `DEMO_USER_PASSWORD` value in each project's `.env`:
 Handbooks are validated by `interview-preparation/render_handbook.py`, which fails if a question
 references a file that does not exist.
 
+Free hosting options and a pre-publish hardening checklist: [docs/free-hosting.md](docs/free-hosting.md).
+
 ## Honesty rules used throughout
 - No metric is shown unless a committed artifact produced by running code contains it.
 - Placeholders (names, links, deployed URLs) are labeled and never presented as live.
