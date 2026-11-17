@@ -5,9 +5,9 @@
 2. Push each project to its own GitHub repository so the three CI workflows actually run.
 3. Add an LLM key (GEMINI_API_KEY) and re-run the EvalOps benchmarks with LLM_PROVIDER=gemini for
    NEXUS and DATAWISE; compare against the local-adapter baselines already stored.
-4. EvalOps: make groundedness skip expected-abstention cases (documented false failure).
-5. DATAWISE: decide the all-time-aggregate policy (clarify vs default to all time) and align the
-   benchmark or the planner deliberately.
-6. NEXUS: S3 ObjectStorage adapter + OpenTelemetry spans; ingestion lock heartbeat.
+4. (done 2026-11-17) EvalOps groundedness skips correct refusals; DATAWISE defaults bare totals to all time;
+   NEXUS S3 adapter, OpenTelemetry spans and ingestion heartbeat implemented.
+5. Remaining engineering: fencing token for ingestion jobs; streaming/multipart S3; run S3Storage against
+   real AWS and OTel against a real collector; context_precision that is top-k aware.
 7. Deploy one project (NEXUS) to AWS using nexus-ai/docs/deployment.md.
-8. Delete the local test account e2e-viewer@evalops.local before any shared deployment.
+8. (done) Local e2e test account was deleted; re-create it only when running EvalOps e2e.

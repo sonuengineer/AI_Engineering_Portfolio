@@ -40,6 +40,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.12"
       - name: Install dependencies
         run: uv sync --frozen
       - name: Create databases and read-only role (same script as docker init)
@@ -60,7 +62,11 @@ jobs:
         run: uv run pip-audit
       - name: Evaluation gate
         run: |
-          uv run uvicorn app.main:app --port 8102 &
+          # Start the API from the venv directly (not via `uv run`) and always stop it, so no process
+          # keeps the uv cache locked when setup-uv prunes the cache in its post step.
+          .venv/bin/uvicorn app.main:app --port 8102 &
+          API_PID=$!
+          trap 'kill $API_PID 2>/dev/null || true' EXIT
           for i in $(seq 1 30); do curl -sf localhost:8102/readyz && break; sleep 1; done
           uv run python ../evaluation/build_expected.py
           uv run python ../evaluation/run_eval.py --password "$DEMO_USER_PASSWORD" --min-accuracy 0.90

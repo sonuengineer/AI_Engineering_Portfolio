@@ -16,6 +16,7 @@ from app.core.context import request_id_var
 from app.core.db import get_engine
 from app.core.errors import install_error_handlers
 from app.core.logging import configure_logging, get_logger
+from app.core.telemetry import configure_tracing
 from app.tools import builtin as _builtin_tools  # noqa: F401 -- registers tools
 
 log = get_logger("nexus.api")
@@ -43,6 +44,13 @@ def _embedded_worker(stop: threading.Event) -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     configure_logging()
+    configure_tracing("nexus-api")
+    from app.ingestion.storage import prepare_storage
+
+    try:
+        prepare_storage()
+    except Exception as exc:  # noqa: BLE001 -- storage outage must not block boot; uploads will report it
+        log.error("storage_prepare_failed", error_type=type(exc).__name__)
     from app.services.workflows import mark_interrupted_runs
 
     try:

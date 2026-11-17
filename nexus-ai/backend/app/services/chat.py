@@ -11,8 +11,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.errors import NotFound
+from app.core.telemetry import tracer
 from app.ingestion.injection import wrap_untrusted
-from app.llm import LLMRequest, get_llm
+from app.llm import LLMRequest, traced_generate
 from app.models import Conversation, MemoryItem, Message, User
 from app.schemas.llm_outputs import GroundedAnswer
 from app.services.audit import audit, record_usage
@@ -71,6 +72,15 @@ def validate_citations(answer: GroundedAnswer, n_contexts: int) -> GroundedAnswe
 
 
 def ask(db: Session, user: User, question: str, conversation_id: str | None) -> AskResult:
+    with tracer.start_as_current_span("chat.ask") as span:
+        span.set_attribute("chat.question_chars", len(question))
+        result = _ask(db, user, question, conversation_id)
+        span.set_attribute("chat.citations", len(result.citations))
+        span.set_attribute("chat.insufficient_evidence", result.insufficient_evidence)
+        return result
+
+
+def _ask(db: Session, user: User, question: str, conversation_id: str | None) -> AskResult:
     t0 = time.perf_counter()
     if conversation_id:
         conv = db.get(Conversation, conversation_id)
@@ -99,7 +109,7 @@ def ask(db: Session, user: User, question: str, conversation_id: str | None) -> 
             {"id": i, "text": c.text, "title": c.document_title, "page": c.page} for i, c in enumerate(chunks, start=1)
         ],
     }
-    raw, usage = get_llm().generate(
+    raw, usage = traced_generate(
         LLMRequest(task="answer_question", system=SYSTEM_PROMPT, user=prompt, payload=payload),
         GroundedAnswer,
     )

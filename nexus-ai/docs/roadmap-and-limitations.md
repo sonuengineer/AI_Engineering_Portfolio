@@ -7,28 +7,31 @@
   provider and re-indexing.
 - **Gemini/OpenAI adapters are untested live** (no keys in this environment); verified against SDK
   signatures and type checks only.
-- **Object storage**: only the local filesystem implementation exists; S3 adapter is designed
-  (protocol in `ingestion/storage.py`) but not written.
+- **Object storage**: local filesystem (default) and an S3/S3-compatible adapter (`S3Storage`,
+  tested with moto and manually against a real SeaweedFS S3 gateway). Not tested against real AWS S3
+  (no credentials); no streaming or multipart for very large objects; no KMS-managed keys.
 - **No OCR**: scanned PDFs produce no text and fail ingestion with a clear error.
 - **Rate limiting per process**; **no refresh tokens**; JWT in sessionStorage.
 - **Single-tenant admin UI**: no user management screens (users are seeded).
 - **Workflow types**: only the customer-decline investigation is implemented; the supervisor
   rejects other goals honestly.
-- **OpenTelemetry**: request ids and structured logs exist; OTel tracing export is not wired in
-  NEXUS (EvalOps implements tracing).
+- **OpenTelemetry**: spans for chat, retrieval, LLM calls, tools and workflow steps export over OTLP
+  when OTEL_EXPORTER_OTLP_ENDPOINT is set (verified with an in-memory exporter; never sent to a real
+  collector). No metrics, no sampling configuration, no FastAPI/SQLAlchemy auto-instrumentation.
 - **Frontend bundle** is not code-split (~700 kB).
 - **Not deployed**: deployment guide is a design, not an executed runbook.
 - **Token budget projection** counts prompt size before a call but not the upcoming output tokens,
   and failed attempts are not charged; `budget_exceeded` runs cannot be resumed with a raised budget.
-- **Ingestion locks are not refreshed**: a job running longer than 10 minutes can be reclaimed by a
-  second worker (heartbeat column is the fix).
+- **Ingestion locks**: a heartbeat now refreshes the lock every 60 s while a job runs, so slow jobs
+  are not reclaimed. There is still no fencing token: a worker paused past the 10-minute staleness
+  window (GC pause, partition) can be raced by a second worker.
 - **Login rate limiting behind a proxy**: unless uvicorn trusts the proxy (`--forwarded-allow-ips`),
   all clients behind nginx share one per-IP bucket; trusting `*` would allow spoofing when the API
   port is exposed directly. Production: rate-limit at the WAF/ALB.
 
 ## Roadmap (priority order)
-1. S3 object storage adapter + MinIO in compose.
-2. OpenTelemetry spans for retrieval, model and tool calls.
+1. Fencing token for ingestion jobs; streaming/multipart S3 uploads; run against real AWS S3.
+2. OTel metrics, sampling, and a collector in compose.
 3. Cross-encoder reranker behind the same `rerank` interface.
 4. Redis-backed rate limiter and token revocation.
 5. More workflow types (quotation follow-up, churn-risk sweep) as additional graphs.

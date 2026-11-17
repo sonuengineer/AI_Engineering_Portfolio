@@ -878,11 +878,11 @@ Labels: `[impl]` = implemented in this repo, `[ext]` = proposed extension (not i
 
 `advanced` `[impl]`
 
-**Answer.** Document bytes go to object storage under content-addressed keys '<org_id>/<sha256>.<ext>' (LocalStorage today); extracted chunk text and embeddings, emails, CRM/ERP rows, messages, approvals with email bodies, and audit details live in Postgres. Nothing is encrypted at the application layer; the threat model relies on disk/RDS/S3 encryption at rest. Also, deleting a document removes the row (chunks cascade) but the stored blob is not deleted - ObjectStorage has no delete method - which matters for data-retention and GDPR deletion requests.
+**Answer.** Document bytes go to object storage under content-addressed keys '<org_id>/<sha256>.<ext>' (LocalStorage by default, S3Storage when STORAGE_BACKEND=s3); extracted chunk text and embeddings, emails, CRM/ERP rows, messages, approvals with email bodies, and audit details live in Postgres. Nothing is encrypted at the application layer; the threat model relies on disk/RDS encryption, and S3Storage asks AWS for server-side encryption (AES256) on every put (skipped for S3-compatible stores that do not support the header). Deleting a document removes the row (chunks cascade) and then, after the commit, the stored blob if no other document shares the key (ObjectStorage.delete, covered by test_delete_document_removes_stored_object). A full tenant-erasure workflow still does not exist.
 
 **Why it matters.** Probes data lifecycle awareness, including a real gap in deletion.
 
-**Code:** `backend/app/ingestion/storage.py:ObjectStorage`, `backend/app/api/documents.py:delete_document`, `docs/security-threat-model.md`
+**Code:** `backend/app/ingestion/storage.py:ObjectStorage`, `backend/app/ingestion/storage.py:S3Storage`, `backend/app/api/documents.py:delete_document`, `docs/security-threat-model.md`
 
 **Follow-ups:**
 - How would you implement right-to-erasure end to end?
@@ -951,29 +951,29 @@ Labels: `[impl]` = implemented in this repo, `[ext]` = proposed extension (not i
 
 `beginner` `[impl]`
 
-**Answer.** Structured JSON logs via structlog with request ids, per-request access logs with latency, and redaction. Request ids are generated or validated in middleware, returned in X-Request-ID, set by nginx, included in error envelopes and stored on every audit event. usage_records capture provider, model, tokens, estimated cost and latency per model call (purpose, run_id), surfaced in /admin/usage. workflow_steps store attempts, errors, timings and tool calls for each agent step. /healthz is liveness and /readyz checks the DB. OpenTelemetry tracing export is not wired in NEXUS.
+**Answer.** Structured JSON logs via structlog with request ids, per-request access logs with latency, and redaction. Request ids are generated or validated in middleware, returned in X-Request-ID, set by nginx, included in error envelopes and stored on every audit event. usage_records capture provider, model, tokens, estimated cost and latency per model call, surfaced in /admin/usage. workflow_steps store attempts, errors, timings and tool calls. /healthz is liveness and /readyz checks the DB. Tracing: OpenTelemetry spans exist for chat.ask, retrieval.hybrid_search, llm.generate, tool.<name> and workflow.step <name>; they are no-ops unless OTEL_EXPORTER_OTLP_ENDPOINT is set, in which case they export over OTLP/HTTP. Span attributes carry ids, sizes, providers and token counts, never prompt or document text (asserted by a test). Not done: metrics (counters/histograms), and auto-instrumentation of FastAPI/SQLAlchemy.
 
 **Why it matters.** Probes logs/metrics/traces awareness and what is missing.
 
-**Code:** `backend/app/core/logging.py`, `backend/app/main.py:create_app`, `backend/app/api/admin.py:usage`, `backend/app/models/workflows.py:UsageRecord`
+**Code:** `backend/app/core/logging.py`, `backend/app/core/telemetry.py:configure_tracing`, `backend/app/llm/__init__.py:traced_generate`, `backend/app/api/admin.py:usage`
 
 **Follow-ups:**
 - What metrics would you alert on?
 - How would you correlate a log line with an audit event?
 
-### eval-05. How would you add OpenTelemetry spans around run_step, tool calls and model calls?
+### eval-05. How are OpenTelemetry spans propagated across the ThreadPoolExecutor in run_step, and what stays out of spans?
 
-`advanced` `[ext]`
+`advanced` `[impl]`
 
-**Answer.** Add the OTel SDK with an OTLP exporter configured from env, instrument FastAPI and SQLAlchemy automatically, and create manual spans: in run_step one span per attempt named 'workflow.step' with attributes run_id, step name, agent, attempt, and set status/error on failure; in StepContext.tool a child span 'tool.<name>' with latency and ok; in StepContext.llm a span 'llm.<purpose>' with provider, model and token counts but never prompts. Because _execute runs in a ThreadPoolExecutor, the parent context must be captured and attached in the worker thread (context.attach), otherwise spans are orphaned. Add request_id as a span attribute to join with logs. Not implemented (roadmap item 2).
+**Answer.** run_step starts one span per attempt ('workflow.step <name>', attributes run_id, step, agent, attempt, outcome, retryable). Because _execute runs in a ThreadPoolExecutor thread and OTel context is thread-local (contextvars), the code captures the context with the step span attached (contextvars.copy_context inside trace.use_span) and submits step_ctx.run(...) to the pool, so tool.<name> and llm.generate spans created inside the step become its children; a test (test_workflow_tool_spans_are_children_of_step_spans_across_threads) asserts the parent link. Failures set ERROR status; retries appear as separate step spans. Attributes carry ids, sizes, provider/model and token counts but never prompt text, document text or email bodies (test_chat_spans_nest_and_carry_no_text). Without OTEL_EXPORTER_OTLP_ENDPOINT the tracer is the API no-op.
 
-**Why it matters.** Tests practical tracing in threaded code; context propagation across the executor is the key insight.
+**Why it matters.** Tests practical tracing in threaded code; context propagation across the executor is the key insight, and the privacy rule shows judgment.
 
-**Code:** `backend/app/agents/runtime.py:run_step`, `backend/app/agents/runtime.py:StepContext`, `docs/roadmap-and-limitations.md`
+**Code:** `backend/app/agents/runtime.py:run_step`, `backend/app/core/telemetry.py:configure_tracing`, `backend/app/tools/registry.py:execute`, `tests/test_storage_tracing_heartbeat.py`
 
 **Follow-ups:**
-- What would you sample?
-- Would you put tokens in metrics or spans?
+- What would you sample in production?
+- How would you add request_id to spans to join with logs?
 
 ### eval-06. What do the frontend tests check, and why those cases?
 
@@ -1348,19 +1348,19 @@ Labels: `[impl]` = implemented in this repo, `[ext]` = proposed extension (not i
 - Is there a race between execute_run finishing and an approval?
 - How would you make completion event-driven?
 
-### dbg-07. An ingestion job for a very large document is processed twice concurrently. How is that possible?
+### dbg-07. An ingestion job for a very large document was reclaimed and processed twice concurrently. How could that happen, and what protects against it now?
 
 `advanced` `[impl]`
 
-**Answer.** claim_next reclaims 'processing' jobs whose locked_at is older than STALE_AFTER (10 minutes). The lock is a lease set once at claim time; there is no heartbeat. If indexing a huge document takes longer than 10 minutes, a second worker reclaims it while the first is still working. Both delete and re-insert the document's chunks in their own transactions, so the outcome is usually consistent (last commit wins) but work is duplicated and attempts are inflated toward max_attempts. Fix: a heartbeat that updates locked_at periodically, a lease token checked on completion, or a timeout bound on job duration.
+**Answer.** claim_next reclaims 'processing' jobs whose locked_at is older than STALE_AFTER (10 minutes). The lock was originally set once at claim time, so a job running longer than 10 minutes looked like a dead worker's job and a second worker reclaimed it; both then deleted and re-inserted the chunks, wasting work and inflating attempts. Fixed with a heartbeat: run_job starts a daemon thread that, every HEARTBEAT_INTERVAL_S (60 s, far below STALE_AFTER), refreshes locked_at in its own session while the job is still 'processing', and a finally block stops it on success or failure (test_long_ingestion_job_keeps_its_lock_fresh). What it does not give: a fencing/lease token, so a worker that was genuinely paused (GC, network partition) past STALE_AFTER can still be raced by a second one; the compare-and-set on completion in exercise ex-08 closes that.
 
-**Why it matters.** Lease-based queues and the missing heartbeat; a classic distributed-systems pitfall.
+**Why it matters.** Lease-based queues: a heartbeat fixes slow-but-alive workers, a fencing token fixes paused-but-alive workers. Strong candidates know the difference.
 
-**Code:** `backend/app/ingestion/jobs.py:claim_next`, `backend/app/ingestion/jobs.py:STALE_AFTER`, `backend/app/ingestion/indexer.py:index_document`
+**Code:** `backend/app/ingestion/jobs.py:claim_next`, `backend/app/ingestion/jobs.py:run_job`, `backend/app/ingestion/jobs.py:_heartbeat`, `backend/app/ingestion/jobs.py:STALE_AFTER`
 
 **Follow-ups:**
-- How would you implement the heartbeat in a sync worker?
-- Could the two transactions deadlock?
+- Why refresh in a separate session instead of the job's session?
+- What would a fencing token look like here?
 
 ### dbg-08. The frontend shows 'Cannot reach the NEXUS API'. What does that mean?
 
@@ -1668,19 +1668,19 @@ Labels: `[impl]` = implemented in this repo, `[ext]` = proposed extension (not i
 <a id="advanced-design-coding"></a>
 ## Advanced design and coding
 
-### adv-01. Implement an S3-backed ObjectStorage. What would it look like and what must you watch out for?
+### adv-01. How does the S3-backed ObjectStorage work, and what did you have to watch out for?
 
-`advanced` `[ext]`
+`advanced` `[impl]`
 
-**Answer.** Implement the ObjectStorage Protocol (put(key, data) -> key, get(key) -> bytes) with boto3: put_object with ServerSideEncryption aws:kms and ContentType, get_object(...)['Body'].read(). Select it in get_storage via a setting (e.g. STORAGE_BACKEND=s3 plus bucket and prefix). Validate keys (no leading slash or '..', must start with an org id) because the LocalStorage traversal guard does not apply. Use IAM task roles, not keys; consider a delete method for retention; and test against MinIO in compose. The roadmap lists this as item 1 - not implemented.
+**Answer.** S3Storage implements the ObjectStorage protocol (put, get, delete) with boto3 and is selected by STORAGE_BACKEND=s3 (bucket, region, optional endpoint and credentials via settings). Keys are the same content-addressed '<org_id>/<sha256>.<ext>' keys, validated against empty, absolute and '..' segments because LocalStorage's resolved-path guard does not apply. On AWS it sets ServerSideEncryption=AES256 on put; for S3-compatible stores (endpoint set) the header is omitted. get maps NoSuchKey to FileNotFoundError so callers behave identically to LocalStorage; delete is naturally idempotent. prepare_storage creates the bucket at startup. Credentials default to boto3's chain (IAM role) when keys are empty. Tests use moto for the AWS boundary and a manual round trip was run against a real SeaweedFS S3 gateway from the compose 's3' profile. Not done: streaming large objects (get reads the whole body), multipart upload, and KMS-managed keys.
 
-**Why it matters.** Practical extension against an existing interface.
+**Why it matters.** Practical extension against an existing interface: the answer should mention key validation, error mapping and not putting credentials in code.
 
-**Code:** `backend/app/ingestion/storage.py:ObjectStorage`, `backend/app/ingestion/storage.py:get_storage`, `docs/deployment.md`
+**Code:** `backend/app/ingestion/storage.py:S3Storage`, `backend/app/ingestion/storage.py:get_storage`, `backend/app/ingestion/storage.py:prepare_storage`, `tests/test_storage_tracing_heartbeat.py`
 
 **Follow-ups:**
 - How would you stream large objects instead of loading bytes?
-- How would you test without AWS?
+- Why moto for unit tests and a real S3-compatible server for a smoke test?
 
 ### adv-02. Design a Redis token bucket to replace TokenBucketLimiter across replicas.
 
@@ -1781,18 +1781,17 @@ Extract the inline fusion logic of backend/app/services/retrieval.py:hybrid_sear
 - Unit tests for weights and edge cases
 - test_hybrid_search_uses_both_signals_and_ranks_relevant_first still passes
 
-### Add an S3 ObjectStorage implementation (`advanced`)
+### Add multipart upload and streaming reads to S3Storage (`advanced`)
 
-Implement S3Storage satisfying the ObjectStorage protocol in backend/app/ingestion/storage.py and select it from get_storage via settings. Include tests that run against MinIO or a stubbed client.
+S3Storage already supports put/get/delete (moto tests + a real S3-compatible smoke test). Extend it to handle objects larger than memory: stream uploads with multipart (upload_fileobj) and expose a get_stream method, and make the extractors consume a stream where possible.
 
-**Solution outline.** Add settings for backend, bucket and prefix; S3Storage.put uses put_object with SSE-KMS, get uses get_object Body.read(); validate keys (org-id prefix, no '..' or leading '/'); keep LocalStorage the default; add a MinIO service to compose for integration tests; document IAM role usage.
+**Solution outline.** Add put_stream(key, fileobj) using boto3 upload_fileobj with a TransferConfig threshold; add get_stream returning the StreamingBody; keep put/get as thin wrappers for small objects; extend the ObjectStorage protocol with default implementations on LocalStorage; test with moto using a 20 MB generated payload and assert memory stays bounded (e.g. tracemalloc peak).
 
 **Evaluation criteria:**
+- Protocol extended without breaking LocalStorage
+- Bounded memory proved by a test
+- Errors mapped like the existing adapter
 - No credentials in code
-- Key validation equivalent to LocalStorage's traversal guard
-- Default behaviour unchanged
-- Tests cover put/get round trip and invalid keys
-- Error mapping when an object is missing
 
 ### Test idempotent approvals under concurrency (`advanced`)
 
@@ -1846,29 +1845,27 @@ Add an optional cross-encoder reranker after RRF fusion in services/retrieval.py
 - Batching to bound latency
 - Evaluation plan with EvalOps before enabling
 
-### Add an OpenTelemetry span around run_step (`intermediate`)
+### Add a span-based latency dashboard and sampling (`intermediate`)
 
-Instrument agents/runtime.py so each step attempt, tool call and model call produces a span exported via OTLP, with correct parent-child relationships across the ThreadPoolExecutor.
+OpenTelemetry spans already exist for chat, retrieval, LLM calls, tools and workflow steps (core/telemetry.py). Add head-based sampling configurable by env var and make sure the sampling decision for a workflow is made once at the root so a run is never exported half-traced.
 
-**Solution outline.** Create a tracer; in run_step start a span per attempt with run_id, step, agent, attempt attributes; capture otel context before _POOL.submit and attach it inside _execute; create child spans in StepContext.tool and StepContext.llm with tool name, provider, model and token counts (no prompts); record exceptions and set error status; make exporter configurable and disabled in tests (or use an in-memory exporter to assert spans).
+**Solution outline.** Configure TracerProvider with ParentBased(TraceIdRatioBased(rate)) from OTEL_TRACES_SAMPLER_ARG; start a root span per workflow run in execute_run so step spans are children; test with an in-memory exporter at rates 0 and 1 and assert that either all or none of a run's spans are exported.
 
 **Evaluation criteria:**
-- Context propagated into the worker thread
-- No sensitive data in attributes
-- Retries visible as separate spans
-- Test with an in-memory span exporter
-- Zero behaviour change when disabled
+- Root span per run
+- ParentBased sampler used
+- Rate 0 exports nothing, rate 1 exports everything
+- Defaults unchanged when the env var is unset
 
-### Detect and fix stale ingestion locks with a heartbeat (`advanced`)
+### Add a fencing token on top of the ingestion heartbeat (`advanced`)
 
-Long ingestion jobs can be reclaimed after STALE_AFTER while still running. Add a heartbeat and a lease token so a reclaimed job's original worker cannot commit stale results.
+The heartbeat keeps long jobs from being reclaimed, but a worker that is paused past STALE_AFTER (GC pause, network partition) can still be raced by another worker. Add a lease token so the original worker cannot commit stale results.
 
-**Solution outline.** Add locked_by (worker id) to ingestion_jobs via an Alembic migration; claim_next sets locked_by; a heartbeat thread updates locked_at every N seconds in its own session while run_job executes; on completion update the job WHERE id = :id AND locked_by = :me and abort if 0 rows; expose an admin query or metric for jobs with old locked_at. Test by simulating a slow index_document with monkeypatch.
+**Solution outline.** Add locked_by (random per-claim token) to ingestion_jobs via an Alembic migration; claim_next sets it; the heartbeat updates WHERE id AND locked_by = :me; completion uses UPDATE ... WHERE id = :id AND locked_by = :me and aborts (rolls back chunk writes) if 0 rows. Test by simulating a reclaim mid-job with monkeypatch and asserting that the first worker's commit is rejected.
 
 **Evaluation criteria:**
 - Migration included
-- Heartbeat uses a separate session
-- Compare-and-set on completion
+- Heartbeat and completion compare the token
 - Test proves the stale worker's commit is rejected
 - No regression in drain() used by tests and seed
 
@@ -1972,7 +1969,7 @@ Extend ground_sources so quoted evidence must appear verbatim in the gathered so
 5. How does URL ingestion defend against SSRF, and what gap remains? (sec-06)
 6. How is prompt injection from documents handled, and what are the limits of the regex scanner? (sec-08)
 7. The rate limiter is per process. What does that mean in practice and how would you fix it? (sec-09)
-8. An ingestion job for a very large document is processed twice concurrently. How is that possible? (dbg-07)
+8. An ingestion job for a very large document was reclaimed and processed twice concurrently. How could that happen, and what protects against it now? (dbg-07)
 9. A customer complains they received the same follow-up email twice. Walk through your investigation. (scn-01)
 10. Users report that searching for a specific quotation number like Q-2026-0412 misses the right document. Why, and what would you change? (scn-02)
 

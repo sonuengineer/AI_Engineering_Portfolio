@@ -12,6 +12,7 @@ from pydantic import BaseModel, ValidationError
 from sqlalchemy.orm import Session
 
 from app.core.errors import AppError, Forbidden
+from app.core.telemetry import tracer
 from app.models import User
 from app.services.audit import audit, audit_independent
 
@@ -71,6 +72,22 @@ def register(spec: ToolSpec) -> ToolSpec:
 
 
 def execute(name: str, args: dict[str, Any], ctx: ToolContext) -> tuple[BaseModel, ToolCallRecord]:
+    """Run a tool inside a 'tool.<name>' span; see _execute for the checks."""
+    spec = REGISTRY.get(name)
+    with tracer.start_as_current_span(f"tool.{name}") as span:
+        span.set_attribute("tool.name", name)
+        span.set_attribute("tool.side_effect", spec.side_effect if spec else "unknown")
+        try:
+            out, record = _execute(name, args, ctx)
+        except Exception as exc:
+            span.set_attribute("tool.outcome", type(exc).__name__)
+            raise
+        span.set_attribute("tool.outcome", "ok")
+        span.set_attribute("tool.latency_ms", record.latency_ms)
+        return out, record
+
+
+def _execute(name: str, args: dict[str, Any], ctx: ToolContext) -> tuple[BaseModel, ToolCallRecord]:
     spec = REGISTRY.get(name)
     if spec is None:
         raise ToolError(f"Unknown tool '{name}'")

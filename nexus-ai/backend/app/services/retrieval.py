@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.telemetry import tracer
 from app.llm import get_embedder
 from app.llm.embeddings import tokenize
 from app.models import Chunk, Document
@@ -41,6 +42,24 @@ def _ts_query(text: str) -> str | None:
 
 
 def hybrid_search(
+    db: Session,
+    org_id: str,
+    query: str,
+    *,
+    k: int = 6,
+    candidates: int = 25,
+    document_ids: list[str] | None = None,
+) -> list[RetrievedChunk]:
+    with tracer.start_as_current_span("retrieval.hybrid_search") as span:
+        span.set_attribute("retrieval.k", k)
+        span.set_attribute("retrieval.candidates", candidates)
+        hits = _hybrid_search(db, org_id, query, k=k, candidates=candidates, document_ids=document_ids)
+        span.set_attribute("retrieval.results", len(hits))
+        span.set_attribute("retrieval.flagged", sum(bool(h.flags.get("suspicious_instructions")) for h in hits))
+        return hits
+
+
+def _hybrid_search(
     db: Session,
     org_id: str,
     query: str,

@@ -10,7 +10,7 @@ Last updated: 2026-11-16
 - Tools: typed registry, RBAC, approval gate, idempotent outbox; MCP server (mcp 2.x MCPServer).
 - API: auth, chat, documents, workflows, approvals, admin, health; request ids; JSON errors; rate limits.
 - Frontend: Login, Ask, Investigations, Run detail, Approvals, Documents, Admin.
-- Tests: 88 pytest, 4 vitest, 4 Playwright e2e (dev and Docker stack). ruff + mypy clean.
+- Tests: 97 pytest, 4 vitest, 4 Playwright e2e (dev and Docker stack). ruff + mypy clean.
 - Docker: api/worker/web images, compose `--profile full` verified healthy.
 - CI: .github/workflows/nexus-ci.yml (not executed on GitHub; no remote).
 - Docs: architecture, ER, sequences, API, env, setup, deployment, security, testing, eval, 6 ADRs, roadmap.

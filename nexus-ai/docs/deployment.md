@@ -30,7 +30,8 @@ flowchart LR
 | Concern | Recommendation |
 |---|---|
 | Database | RDS PostgreSQL 17 with pgvector extension enabled; run `alembic upgrade head` as a one-off ECS task before deploying new API tasks |
-| Object storage | Implement `ObjectStorage` with boto3 against S3 (interface in `app/ingestion/storage.py`; not implemented yet) |
+| Object storage | `S3Storage` exists (`STORAGE_BACKEND=s3`, bucket/region via env, IAM task role via the default boto3 chain, SSE AES256 on AWS). Verified with moto and a real S3-compatible server (compose profile `s3`); not verified against real AWS S3 |
+| Tracing | Set `OTEL_EXPORTER_OTLP_ENDPOINT` to an OTLP/HTTP collector (e.g. ADOT collector sidecar); spans carry ids/sizes/tokens only, never prompt text |
 | Secrets | Secrets Manager -> ECS task env; never bake into images |
 | Workers | Separate ECS service running `python -m app.worker`; set `INGESTION_MODE=worker` on API tasks |
 | Rate limiting | Current limiter is per process; put WAF rate rules in front or move to Redis |

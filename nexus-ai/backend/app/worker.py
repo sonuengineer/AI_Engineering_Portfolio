@@ -5,6 +5,7 @@ import time
 
 from app.core.db import session_factory
 from app.core.logging import configure_logging, get_logger
+from app.core.telemetry import configure_tracing
 from app.ingestion.jobs import claim_next, run_job
 from app.ingestion.storage import get_storage
 
@@ -18,6 +19,10 @@ def _stop(*_: object) -> None:
 
 def main() -> None:
     configure_logging()
+    configure_tracing("nexus-worker")
+    from app.ingestion.storage import prepare_storage
+
+    prepare_storage()
     log = get_logger("worker")
     signal.signal(signal.SIGINT, _stop)
     signal.signal(signal.SIGTERM, _stop)

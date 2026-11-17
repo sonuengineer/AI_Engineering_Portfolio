@@ -69,14 +69,14 @@ export const PROJECTS: Project[] = [
     ],
     docs: commonDocs([{ label: "Performance and evaluation methodology", path: "docs/evaluation-methodology.md" }]),
     verification: [
-      "88 backend tests (real Postgres + pgvector), 4 component tests, 4 Playwright e2e tests passing",
+      "97 backend tests (real Postgres + pgvector), 4 component tests, 4 Playwright e2e tests passing",
       "ruff + mypy clean",
       "Docker stack (api, worker, web, db) built and healthy; e2e passes against it",
     ],
     limitations: [
       "Demo uses a deterministic local adapter; Gemini/OpenAI adapters are not tested live",
       "Local embeddings are lexical (feature hashing), not semantic",
-      "S3 storage adapter and OpenTelemetry export are on the roadmap",
+      "S3 storage and OTLP tracing are implemented but only verified against moto / an S3-compatible server and an in-memory exporter, not real AWS or a collector",
       "Not deployed to the cloud",
     ],
     accent: "from-indigo-500 to-blue-600",

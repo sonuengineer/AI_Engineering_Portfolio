@@ -6,9 +6,9 @@ verification sweep run at the end of the session.
 ## Final verification
 | Project | Backend tests | Lint / types | Frontend unit | Browser e2e (Playwright) | Docker |
 |---|---|---|---|---|---|
-| nexus-ai | 88 passed (real Postgres + pgvector) | ruff + mypy clean | 4 passed | 4 passed (against Docker stack :8081) | api, worker, web, db healthy |
+| nexus-ai | 97 passed (real Postgres + pgvector) | ruff + mypy clean | 4 passed | 4 passed (against Docker stack :8081) | api, worker, web, db healthy |
 | datawise-ai | 149 passed (real Postgres, read-only role) | ruff + mypy clean | 8 passed | 3 passed (:5172) | api, web, db healthy |
-| evalops-ai | 67 passed (real Postgres) | ruff (CI scope) + mypy clean | 15 passed | 2 passed (:5173) | api, worker, web, db healthy |
+| evalops-ai | 68 passed (real Postgres) | ruff (CI scope) + mypy clean | 15 passed | 2 passed (:5173) | api, worker, web, db healthy |
 | portfolio | -- | tsc clean | 5 passed | 4 passed | nginx image serving on :8090 |
 
 Evaluation artifacts (all produced by running code):

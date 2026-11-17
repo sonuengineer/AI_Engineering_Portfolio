@@ -23,7 +23,7 @@
 ## Results (run on 2026-11-16, Windows 11, Docker Postgres)
 
 ```
-backend:   uv run pytest            -> 88 passed in ~17s
+backend:   uv run pytest            -> 97 passed in ~28s
 lint:      ruff check + ruff format --check  -> clean
 types:     mypy app (58 files)      -> Success: no issues found
 frontend:  npx vitest run           -> 4 passed
@@ -50,3 +50,12 @@ Bugs found by these tests or by the e2e run and then fixed:
    - login skipped password hashing for unknown emails (timing oracle) -> verifies against a dummy hash;
    - deleting a document left its stored file -> object deleted after commit
      (`test_delete_document_removes_stored_object`).
+
+## Added 2026-11-17: S3 storage, OpenTelemetry, ingestion heartbeat
+`tests/test_storage_tracing_heartbeat.py` (9 tests, all passing):
+- S3Storage round trip / delete / missing key / unsafe keys / SSE on AWS (moto at the AWS boundary);
+  `get_storage` selects S3 from settings. Also verified manually against a real SeaweedFS S3 gateway
+  (`docker compose --profile s3 up -d object-store`).
+- Spans: chat.ask -> retrieval.hybrid_search / llm.generate nest correctly; no question text in any
+  span attribute; tool spans are children of workflow.step spans across the thread pool.
+- Heartbeat: a deliberately slow ingestion job (0.6 s, 0.1 s heartbeat) ends with locked_at advanced.

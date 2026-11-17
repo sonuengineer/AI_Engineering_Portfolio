@@ -7,12 +7,15 @@ merged into workflow_runs.state, so a resumed run skips completed steps (recover
 from __future__ import annotations
 
 import concurrent.futures as cf
+import contextvars
 import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from opentelemetry import trace
+from opentelemetry.trace import Status, StatusCode
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -20,7 +23,8 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.db import session_factory
 from app.core.errors import AppError, Forbidden
-from app.llm import LLMRequest, Usage, get_llm
+from app.core.telemetry import tracer
+from app.llm import LLMRequest, Usage, traced_generate
 from app.llm.base import T
 from app.models import User, WorkflowRun, WorkflowStep
 from app.models.base import utcnow
@@ -63,7 +67,7 @@ class StepContext:
         projected = self.run.tokens_used + self.tokens + len(request.system + request.user) // 4
         if projected > self.run.token_budget:
             raise BudgetExceeded(f"token budget {self.run.token_budget} would be exceeded")
-        result, usage = get_llm().generate(request, schema)
+        result, usage = traced_generate(request, schema)
         self._charge(usage, purpose)
         return result
 
@@ -107,9 +111,23 @@ def run_step(run_id: str, seq: int, name: str, agent: str, fn: StepFn, state: di
             st.status, st.attempts, st.started_at, st.error = "running", attempt, utcnow(), None
             db.commit()
         cancelled = threading.Event()
-        fut = _POOL.submit(_execute, run_id, step_id, fn, state, cancelled)
+        span = tracer.start_span(
+            f"workflow.step {name}",
+            attributes={
+                "workflow.run_id": run_id,
+                "workflow.step": name,
+                "workflow.agent": agent,
+                "workflow.attempt": attempt,
+            },
+        )
+        with trace.use_span(span, end_on_exit=False):
+            step_ctx = contextvars.copy_context()  # child spans in the worker thread nest under this step
+        fut = _POOL.submit(step_ctx.run, _execute, run_id, step_id, fn, state, cancelled)
         try:
-            return fut.result(timeout=s.workflow_step_timeout_s)
+            result = fut.result(timeout=s.workflow_step_timeout_s)
+            span.set_attribute("workflow.outcome", "completed")
+            span.end()
+            return result
         except cf.TimeoutError:
             cancelled.set()
             last_error = f"timed out after {s.workflow_step_timeout_s}s"
@@ -119,6 +137,10 @@ def run_step(run_id: str, seq: int, name: str, agent: str, fn: StepFn, state: di
             last_error, retryable, budget = f"{type(exc).__name__}: {exc}", False, isinstance(exc, BudgetExceeded)
         except Exception as exc:  # noqa: BLE001 -- transient failure, retry with backoff
             last_error, retryable, budget = f"{type(exc).__name__}: {exc}", True, False
+        span.set_attribute("workflow.outcome", "failed")
+        span.set_attribute("workflow.retryable", retryable)
+        span.set_status(Status(StatusCode.ERROR, last_error[:200]))
+        span.end()
         with Session_() as db:
             st = db.get(WorkflowStep, step_id)
             assert st is not None

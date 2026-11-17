@@ -74,6 +74,6 @@ Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2.1, Alembic, PostgreSQL 17 + pgve
 Recharts, pytest, Vitest, Playwright, Docker, GitHub Actions.
 
 ## Status
-Verified locally: 88 backend tests, 4 frontend tests and 4 Playwright e2e tests pass; ruff and
+Verified locally: 97 backend tests, 4 frontend tests and 4 Playwright e2e tests pass; ruff and
 mypy are clean. **Not deployed** (no cloud credentials). See [roadmap](docs/roadmap-and-limitations.md)
 for the honest list of limitations.

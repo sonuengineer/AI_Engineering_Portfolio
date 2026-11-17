@@ -39,6 +39,13 @@ class Settings(BaseSettings):
     # embedded: API process runs an ingestion worker thread (dev); worker: separate process (prod)
     ingestion_mode: Literal["embedded", "worker"] = "embedded"
     storage_dir: str = ""
+    # Object storage: "local" filesystem (dev) or "s3" (AWS S3 or any S3-compatible store, e.g. MinIO)
+    storage_backend: Literal["local", "s3"] = "local"
+    s3_bucket: str = "nexus-documents"
+    s3_endpoint_url: str = ""  # empty = AWS; e.g. http://localhost:9000 for MinIO
+    s3_region: str = "us-east-1"
+    s3_access_key_id: str = ""  # empty = boto3 default credential chain (IAM role, env, profile)
+    s3_secret_access_key: str = ""
 
     @field_validator("database_url", "test_database_url")
     @classmethod

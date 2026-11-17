@@ -77,8 +77,9 @@ from an environment variable, never argv):
 cd backend && NEW_USER_PASSWORD=<12+ chars> uv run python -m scripts.create_user --org acme-eval --email e2e-viewer@evalops.local --role viewer
 cd ../frontend && E2E_PASSWORD=<same> npx playwright test
 ```
-Note: the account `e2e-viewer@evalops.local` exists in the local dev database (viewer role, local-only
-password `e2e-viewer-local-only`). Delete or reset it before any shared deployment.
+Note: the account `e2e-viewer@evalops.local` was deleted after the verification session so that no
+test credentials remain in the dev database. Re-create it with the command above before running the
+Playwright suite again, and delete it afterwards.
 
 ## Live benchmarks against NEXUS and DATAWISE
 See `docs/live-benchmark-findings.md`.
