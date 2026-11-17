@@ -1,0 +1,54 @@
+name: datawise
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: datawise-db
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-datawise}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: postgres
+      DATAWISE_READER_PASSWORD: ${DATAWISE_READER_PASSWORD:?set DATAWISE_READER_PASSWORD in .env}
+    ports:
+      - "5442:5432"
+    volumes:
+      - datawise_pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-datawise} -d datawise_analytics"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  api:
+    build:
+      context: ./backend
+    container_name: datawise-api
+    env_file: .env
+    environment:
+      APP_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-datawise}:${POSTGRES_PASSWORD}@db:5432/datawise_app
+      ANALYTICS_ADMIN_DATABASE_URL: postgresql://${POSTGRES_USER:-datawise}:${POSTGRES_PASSWORD}@db:5432/datawise_analytics
+      ANALYTICS_READER_DATABASE_URL: postgresql://datawise_reader:${DATAWISE_READER_PASSWORD}@db:5432/datawise_analytics
+      RUN_MIGRATIONS_AND_SEED: "1"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8102:8102"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8102/readyz')"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  web:
+    build:
+      context: ./frontend
+    container_name: datawise-web
+    depends_on:
+      - api
+    ports:
+      - "5172:80"
+
+volumes:
+  datawise_pgdata:

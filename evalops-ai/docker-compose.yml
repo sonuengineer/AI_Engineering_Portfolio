@@ -1,0 +1,75 @@
+name: evalops
+
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: evalops-db
+    environment:
+      POSTGRES_USER: evalops
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-evalops_dev_password}
+      POSTGRES_DB: evalops
+    ports:
+      - "5443:5432"
+    volumes:
+      - evalops-pgdata:/var/lib/postgresql/data
+      - ./backend/scripts/init-test-db.sql:/docker-entrypoint-initdb.d/10-init-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U evalops -d evalops"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: evalops-api
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://evalops:${POSTGRES_PASSWORD:-evalops_dev_password}@db:5432/evalops
+      RUN_WORKER_IN_API: "false"
+      CORS_ORIGINS: http://localhost:5173
+      NEXUS_BASE_URL: ${EVALOPS_DOCKER_NEXUS_URL:-http://host.docker.internal:8101}
+      DATAWISE_BASE_URL: ${EVALOPS_DOCKER_DATAWISE_URL:-http://host.docker.internal:8102}
+    command: ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8103"]
+    ports:
+      - "8103:8103"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8103/healthz').status==200 else 1)"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: evalops-worker
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://evalops:${POSTGRES_PASSWORD:-evalops_dev_password}@db:5432/evalops
+      NEXUS_BASE_URL: ${EVALOPS_DOCKER_NEXUS_URL:-http://host.docker.internal:8101}
+      DATAWISE_BASE_URL: ${EVALOPS_DOCKER_DATAWISE_URL:-http://host.docker.internal:8102}
+    command: ["python", "-m", "app.worker"]
+    depends_on:
+      api:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./frontend
+    container_name: evalops-web
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+
+volumes:
+  evalops-pgdata:

@@ -1,0 +1,62 @@
+[project]
+name = "evalops-backend"
+version = "0.1.0"
+description = "EvalOps AI -- LLM evaluation, benchmarking and observability platform"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi==0.163.1",
+    "pydantic==2.14.*",
+    "pydantic-settings==2.16.*",
+    "sqlalchemy==2.1.8",
+    "alembic==1.20.1",
+    "psycopg[binary]==3.3.9",
+    "pyjwt==2.15.*",
+    "argon2-cffi==25.1.*",
+    "structlog==26.1.*",
+    "uvicorn==0.54.*",
+    "httpx==0.28.*",
+    "pyyaml>=6.0",
+    "jsonschema>=4.23",
+    "python-multipart>=0.0.20",
+    "opentelemetry-sdk==1.45.*",
+]
+
+[project.optional-dependencies]
+gemini = ["google-genai==3.3.0"]
+openai = ["openai==3.51.*"]
+otlp = ["opentelemetry-exporter-otlp-proto-http==1.45.*"]
+
+[dependency-groups]
+dev = [
+    "pytest==9.2.*",
+    "ruff==0.17.*",
+    "mypy==2.4.*",
+    "types-pyyaml",
+    "types-jsonschema",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 130
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "W"]
+ignore = ["B008"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_unused_ignores = false
+check_untyped_defs = true
+exclude = ["alembic/"]
+
+[tool.pytest.ini_options]
+testpaths = ["../tests"]
+pythonpath = ["."]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app", "alembic"]
+known-local-folder = ["helpers", "conftest"]

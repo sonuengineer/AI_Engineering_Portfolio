@@ -1,0 +1,60 @@
+[project]
+name = "nexus-ai-backend"
+version = "0.1.0"
+description = "NEXUS AI -- autonomous enterprise intelligence platform (API)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "alembic>=1.20.1",
+    "argon2-cffi>=25.1.0",
+    "email-validator>=2.4.0",
+    "fastapi>=0.163.1",
+    "fpdf2>=2.9.0",
+    "google-genai>=3.3.0",
+    "httpx>=0.28.1",
+    "langgraph>=1.2.22",
+    "mcp>=2.3.0",
+    "openai>=3.51.0",
+    "openpyxl>=3.1.5",
+    "pgvector>=0.5.1",
+    "psycopg[binary]>=3.3.9",
+    "pydantic>=2.14.3",
+    "pydantic-settings>=2.16.3",
+    "pyjwt>=2.15.1",
+    "pypdf>=7.1.0",
+    "python-docx>=1.2.0",
+    "python-multipart>=0.0.34",
+    "sqlalchemy>=2.1.8",
+    "structlog>=26.1.0",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "SIM"]
+ignore = ["S101", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/*" = ["S311", "E501"]
+"../tests/*" = ["S"]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = ["pydantic.mypy"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+check_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["../tests"]
+pythonpath = ["."]
+addopts = "-q"
+
+[dependency-groups]
+dev = [
+    "mypy>=2.4.1",
+    "pytest>=9.2.0",
+    "ruff>=0.17.5",
+]

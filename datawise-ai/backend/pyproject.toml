@@ -1,0 +1,59 @@
+[project]
+name = "datawise-api"
+version = "0.1.0"
+description = "DATAWISE AI -- natural-language BI with safe text-to-SQL (semantic layer -> query plan -> validated SQL)"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.163.1",
+    "pydantic>=2.14",
+    "pydantic-settings>=2.16",
+    "sqlalchemy>=2.1.8",
+    "alembic>=1.20.1",
+    "psycopg[binary]>=3.3.9",
+    "sqlglot>=30.32.0",
+    "pyjwt>=2.15",
+    "argon2-cffi>=25.1",
+    "structlog>=26.1",
+    "uvicorn>=0.54",
+    "email-validator>=2.2",
+    "google-genai>=3.3.0",
+    "openai>=3.51",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2",
+    "ruff>=0.17",
+    "mypy>=2.4",
+    "httpx>=0.28",
+    "pip-audit>=2.9",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "SIM"]
+ignore = ["S101", "S105", "S106", "S608", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"../tests/**" = ["S", "B"]
+"scripts/**" = ["S311"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = false
+warn_unused_ignores = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+plugins = ["pydantic.mypy"]
+exclude = ["alembic/"]
+
+[tool.pytest.ini_options]
+testpaths = ["../tests"]
+pythonpath = ["."]

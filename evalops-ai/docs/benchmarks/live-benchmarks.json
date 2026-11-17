@@ -1,0 +1,196 @@
+{
+  "exported_at": "2026-11-17T05:31:40+00:00",
+  "runs": [
+    {
+      "run_id": "6da034ca-7c95-4cdb-9c0c-538b34e9aa6e",
+      "label": "NEXUS live (local adapter), dataset v2, refusal-aware groundedness",
+      "dataset_version": 2,
+      "dataset_hash": "6ab9d90d55d4",
+      "case_count": 32,
+      "overall_pass_rate": 0.125,
+      "error_rate": 0.0,
+      "latency_ms": {
+        "max": 827.6418999994348,
+        "p50": 171.4626999992106,
+        "p95": 818.5654999997496,
+        "mean": 249.31626250008776
+      },
+      "metrics_pass_rate": {
+        "keywords": 0.6333333333333333,
+        "citations": 0.6333333333333333,
+        "groundedness": 0.6666666666666666,
+        "context_recall": 1.0,
+        "context_precision": 0.13333333333333333,
+        "latency_under_10s": 1.0,
+        "no_leak_or_injection": 1.0,
+        "unanswerable_refusal": 1.0
+      },
+      "metrics_scored": {
+        "keywords": 30,
+        "citations": 30,
+        "groundedness": 30,
+        "context_recall": 30,
+        "context_precision": 30,
+        "latency_under_10s": 32,
+        "no_leak_or_injection": 2,
+        "unanswerable_refusal": 2
+      }
+    },
+    {
+      "run_id": "1c49994f-a64c-4aa9-859e-da7f632b8c1b",
+      "label": "NEXUS live (local adapter)",
+      "dataset_version": 1,
+      "dataset_hash": "098bec15ef93",
+      "case_count": 32,
+      "overall_pass_rate": 0.0625,
+      "error_rate": 0.0,
+      "latency_ms": {
+        "max": 215.41489999799524,
+        "p50": 71.81594999565277,
+        "p95": 210.17234500977793,
+        "mean": 80.43457812482302
+      },
+      "metrics_pass_rate": {
+        "keywords": 0.6333333333333333,
+        "citations": 0.6333333333333333,
+        "groundedness": 0.625,
+        "context_recall": 1.0,
+        "context_precision": 0.13333333333333333,
+        "latency_under_10s": 1.0,
+        "no_leak_or_injection": 1.0,
+        "unanswerable_refusal": 0.0
+      },
+      "metrics_scored": {
+        "keywords": 30,
+        "citations": 30,
+        "groundedness": 32,
+        "context_recall": 30,
+        "context_precision": 30,
+        "latency_under_10s": 32,
+        "no_leak_or_injection": 2,
+        "unanswerable_refusal": 2
+      }
+    },
+    {
+      "run_id": "ce76aefd-e3b6-4dd7-a687-f0e911d8aff2",
+      "label": "NEXUS live (local adapter), dataset v2",
+      "dataset_version": 2,
+      "dataset_hash": "6ab9d90d55d4",
+      "case_count": 32,
+      "overall_pass_rate": 0.0625,
+      "error_rate": 0.0,
+      "latency_ms": {
+        "max": 201.8553000089014,
+        "p50": 70.00870000047144,
+        "p95": 193.334059996414,
+        "mean": 80.9191124994868
+      },
+      "metrics_pass_rate": {
+        "keywords": 0.6333333333333333,
+        "citations": 0.6333333333333333,
+        "groundedness": 0.625,
+        "context_recall": 1.0,
+        "context_precision": 0.13333333333333333,
+        "latency_under_10s": 1.0,
+        "no_leak_or_injection": 1.0,
+        "unanswerable_refusal": 1.0
+      },
+      "metrics_scored": {
+        "keywords": 30,
+        "citations": 30,
+        "groundedness": 32,
+        "context_recall": 30,
+        "context_precision": 30,
+        "latency_under_10s": 32,
+        "no_leak_or_injection": 2,
+        "unanswerable_refusal": 2
+      }
+    },
+    {
+      "run_id": "11082673-9d51-4423-b3f2-7bd3b9f05d12",
+      "label": "NEXUS live (local adapter), dataset v2, groundedness skips abstentions",
+      "dataset_version": 2,
+      "dataset_hash": "6ab9d90d55d4",
+      "case_count": 32,
+      "overall_pass_rate": 0.125,
+      "error_rate": 0.0,
+      "latency_ms": {
+        "max": 4755.066500001703,
+        "p50": 273.4464499999376,
+        "p95": 4737.159424999754,
+        "mean": 820.6838812500337
+      },
+      "metrics_pass_rate": {
+        "keywords": 0.6333333333333333,
+        "citations": 0.6333333333333333,
+        "groundedness": 0.6666666666666666,
+        "context_recall": 1.0,
+        "context_precision": 0.13333333333333333,
+        "latency_under_10s": 1.0,
+        "no_leak_or_injection": 1.0,
+        "unanswerable_refusal": 1.0
+      },
+      "metrics_scored": {
+        "keywords": 30,
+        "citations": 30,
+        "groundedness": 30,
+        "context_recall": 30,
+        "context_precision": 30,
+        "latency_under_10s": 32,
+        "no_leak_or_injection": 2,
+        "unanswerable_refusal": 2
+      }
+    },
+    {
+      "run_id": "ee2df839-9405-4bba-9daf-92323bdd956d",
+      "label": "DATAWISE live (local planner)",
+      "dataset_version": 1,
+      "dataset_hash": "35b05e0379b4",
+      "case_count": 30,
+      "overall_pass_rate": 0.8333333333333334,
+      "error_rate": 0.0,
+      "latency_ms": {
+        "max": 235.26309999579098,
+        "p50": 63.961250001739245,
+        "p95": 225.9469500015257,
+        "mean": 80.68872666432678
+      },
+      "metrics_pass_rate": {
+        "status": 0.8333333333333334,
+        "result_rows": 0.7222222222222222,
+        "latency_under_10s": 1.0
+      },
+      "metrics_scored": {
+        "status": 30,
+        "result_rows": 18,
+        "latency_under_10s": 30
+      }
+    },
+    {
+      "run_id": "bbc862db-8bb2-4da0-817b-c86a69b1b42a",
+      "label": "DATAWISE live (local planner), all-time default policy",
+      "dataset_version": 1,
+      "dataset_hash": "35b05e0379b4",
+      "case_count": 30,
+      "overall_pass_rate": 1.0,
+      "error_rate": 0.0,
+      "latency_ms": {
+        "max": 1511.5151999998488,
+        "p50": 213.8209500008088,
+        "p95": 1460.1298200001108,
+        "mean": 401.8756166666208
+      },
+      "metrics_pass_rate": {
+        "status": 1.0,
+        "result_rows": 1.0,
+        "latency_under_10s": 1.0
+      },
+      "metrics_scored": {
+        "status": 30,
+        "result_rows": 18,
+        "latency_under_10s": 30
+      }
+    }
+  ],
+  "note": "Exported verbatim from stored EvalOps runs against the live NEXUS and DATAWISE APIs (both using their deterministic local adapters). overall_pass_rate requires every gating metric of a case to pass."
+}

@@ -1,0 +1,15 @@
+# Build context: the evalops-ai/ directory (so benchmarks/ is available to the seed script).
+FROM python:3.12-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy \
+    UV_PROJECT_ENVIRONMENT=/opt/venv PATH="/opt/venv/bin:$PATH"
+COPY --from=ghcr.io/astral-sh/uv:0.12 /uv /usr/local/bin/uv
+WORKDIR /app/backend
+COPY backend/pyproject.toml backend/uv.lock ./
+RUN uv sync --frozen --no-dev --no-install-project
+COPY backend/ ./
+COPY benchmarks/ /app/benchmarks/
+COPY evalops.gate.yaml /app/evalops.gate.yaml
+RUN useradd --create-home --uid 10001 evalops && chown -R evalops /app
+USER evalops
+EXPOSE 8103
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8103"]

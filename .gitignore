@@ -1,0 +1,14 @@
+# Workspace-level safety net; each project also has its own .gitignore.
+.env
+.env.*
+!.env.example
+node_modules/
+.venv/
+__pycache__/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+dist/
+test-results/
+playwright-report/
+*.pyc

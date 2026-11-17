@@ -1,0 +1,11 @@
+.env
+**/.venv/
+**/node_modules/
+frontend/dist/
+**/__pycache__/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+backend/.mypy_cache/
+backend/.ruff_cache/
+evaluation/results/latest.json

@@ -1,0 +1,20 @@
+{
+  "measured_at": "2026-11-17T05:28:36+00:00",
+  "source": "datawise-ai/evaluation/results/latest.json (python evaluation/run_eval.py against the Docker stack)",
+  "provider": "local",
+  "cases": 77,
+  "passed": 71,
+  "accuracy_pct": 92.2,
+  "by_category_pass_pct": {
+    "answered": 100.0,
+    "paraphrase_holdout": 50.0,
+    "clarification": 100.0,
+    "unsafe": 100.0,
+    "edge": 100.0
+  },
+  "latency_ms": {
+    "p50": 73,
+    "p95": 144
+  },
+  "note": "Categories other than paraphrase_holdout were authored alongside the rule-based planner; the held-out paraphrase set is the honest generalization number. Expected values come from independent hand-written SQL (evaluation/build_expected.py). Policy since 2026-11-17: a bare total without a period answers over all available data and states that assumption. Latency measured right after an API container restart."
+}

@@ -1,0 +1,10 @@
+node_modules
+dist
+src/data/generated
+public/screenshots/*/
+.env
+.env.*
+!.env.example
+test-results/
+playwright-report/
+!.env.production

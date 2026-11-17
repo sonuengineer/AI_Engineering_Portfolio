@@ -1,0 +1,16 @@
+# secrets / local config
+.env
+.env.*
+!.env.example
+# python
+.venv/
+__pycache__/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+backend/var/
+# node
+node_modules/
+frontend/dist/
+frontend/test-results/
+frontend/playwright-report/

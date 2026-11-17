@@ -1,0 +1,4 @@
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE DATABASE nexus_test OWNER nexus;
+\connect nexus_test
+CREATE EXTENSION IF NOT EXISTS vector;

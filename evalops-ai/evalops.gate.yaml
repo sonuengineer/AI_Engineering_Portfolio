@@ -1,0 +1,27 @@
+# EvalOps CI gate configuration (used by `python -m app.cli gate|ci-gate --thresholds evalops.gate.yaml`).
+# Metric names are evaluator config names in the project. Judge (estimate) metrics never gate.
+thresholds:
+  min_cases: 20
+  min_overall_pass_rate: 0.95
+  max_error_rate: 0.0
+  max_p95_latency_ms: 2000
+  max_cost_usd: 0.05
+  min_pass_rate:
+    answer_match: 0.95
+    citations: 0.95
+    keywords: 0.95
+    groundedness: 0.9
+
+regression:
+  tolerance: 0.02            # absolute pass-rate drop allowed per metric
+  latency_tolerance_pct: 3.0 # p95 may grow 300% before flagging (tiny ms values are noisy in CI)
+  metric_tolerances: {}
+
+# ci-gate: execute this candidate target and compare against the latest completed run with this label.
+# Works without API keys: the seeded targets use the deterministic mock_scripted provider.
+ci:
+  org: acme-eval
+  project: support-qa
+  dataset: support_faq
+  candidate_target: "Scripted assistant v1"
+  baseline_label: "scripted v1 (baseline)"

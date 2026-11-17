@@ -1,0 +1,100 @@
+name: datawise-ci
+
+on:
+  push:
+    paths: ["datawise-ai/**", ".github/workflows/datawise-ci.yml"]
+  pull_request:
+    paths: ["datawise-ai/**", ".github/workflows/datawise-ci.yml"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: datawise-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: datawise-ai/backend
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: datawise
+          POSTGRES_PASSWORD: ci-admin-password
+          POSTGRES_DB: postgres
+        ports: ["5442:5432"]
+        options: >-
+          --health-cmd "pg_isready -U datawise" --health-interval 3s --health-timeout 3s --health-retries 30
+    env:
+      # CI-only throwaway values (not secrets)
+      APP_DATABASE_URL: postgresql+psycopg://datawise:ci-admin-password@localhost:5442/datawise_app
+      ANALYTICS_ADMIN_DATABASE_URL: postgresql://datawise:ci-admin-password@localhost:5442/datawise_analytics
+      ANALYTICS_READER_DATABASE_URL: postgresql://datawise_reader:ci-reader-password@localhost:5442/datawise_analytics
+      JWT_SECRET: ci-only-jwt-secret-value-0123456789abcdef
+      DEMO_USER_PASSWORD: ci-demo-password
+      LLM_PROVIDER: local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Create databases and read-only role (same script as docker init)
+        env:
+          PGHOST: localhost
+          PGPORT: "5442"
+          PGPASSWORD: ci-admin-password
+          POSTGRES_USER: datawise
+          DATAWISE_READER_PASSWORD: ci-reader-password
+        run: sh ../db/init/01-init.sh
+      - name: Ruff
+        run: uv run ruff check . ../tests ../evaluation
+      - name: Mypy
+        run: uv run mypy app scripts
+      - name: Pytest (real Postgres)
+        run: uv run pytest -q
+      - name: Dependency audit
+        run: uv run pip-audit
+      - name: Evaluation gate
+        run: |
+          uv run uvicorn app.main:app --port 8102 &
+          for i in $(seq 1 30); do curl -sf localhost:8102/readyz && break; sleep 1; done
+          uv run python ../evaluation/build_expected.py
+          uv run python ../evaluation/run_eval.py --password "$DEMO_USER_PASSWORD" --min-accuracy 0.90
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: datawise-eval-results
+          path: datawise-ai/evaluation/results/latest.json
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: datawise-ai/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: datawise-ai/.nvmrc
+          cache: npm
+          cache-dependency-path: datawise-ai/frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build images
+        working-directory: datawise-ai
+        run: |
+          docker build -t datawise-api:ci backend
+          docker build -t datawise-web:ci frontend

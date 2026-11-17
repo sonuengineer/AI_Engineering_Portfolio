@@ -1,0 +1,107 @@
+name: evalops-ai CI
+
+on:
+  push:
+    paths: ["evalops-ai/**", ".github/workflows/evalops-ci.yml"]
+  pull_request:
+    paths: ["evalops-ai/**", ".github/workflows/evalops-ci.yml"]
+
+permissions:
+  contents: read
+
+env:
+  UV_VERSION: "0.12.12"
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: evalops-ai/backend
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: evalops
+          POSTGRES_PASSWORD: evalops_ci_only
+          POSTGRES_DB: evalops_test
+        ports: ["5443:5432"]
+        options: >-
+          --health-cmd "pg_isready -U evalops -d evalops_test" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      TEST_DATABASE_URL: postgresql+psycopg://evalops:evalops_ci_only@localhost:5443/evalops_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+      - run: uv sync --frozen
+      - name: Lint
+        run: uv run ruff check app scripts ../tests ../benchmarks/tools
+      - name: Type check
+        run: uv run mypy app scripts
+      - name: Tests (real Postgres)
+        run: uv run pytest -q ../tests
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: evalops-ai/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: evalops-ai/frontend/.nvmrc
+          cache: npm
+          cache-dependency-path: evalops-ai/frontend/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  eval-gate:
+    # Runs a fresh evaluation against the seeded baseline and fails the build on regression.
+    # Uses only the deterministic mock_scripted provider, so it needs no API keys.
+    runs-on: ubuntu-latest
+    needs: backend
+    defaults:
+      run:
+        working-directory: evalops-ai/backend
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: evalops
+          POSTGRES_PASSWORD: evalops_ci_only
+          POSTGRES_DB: evalops
+        ports: ["5443:5432"]
+        options: >-
+          --health-cmd "pg_isready -U evalops -d evalops" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgresql+psycopg://evalops:evalops_ci_only@localhost:5443/evalops
+      DEMO_USER_PASSWORD: ci-only-demo-password
+      LLM_PROVIDER: local
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: ${{ env.UV_VERSION }}
+      - run: uv sync --frozen
+      - run: uv run alembic upgrade head
+      - name: Seed baseline runs (deterministic providers)
+        run: uv run python -m scripts.seed
+      - name: Eval gate (candidate vs baseline)
+        run: uv run python -m app.cli ci-gate --thresholds ../evalops.gate.yaml --json | tee gate-report.json
+      - name: Gate must catch a known regression (self-test)
+        run: |
+          set +e
+          uv run python -m app.cli ci-gate --thresholds ../evalops.gate.yaml --target "Scripted assistant v2"
+          code=$?
+          if [ "$code" -ne 1 ]; then echo "expected exit 1 for regressed candidate, got $code"; exit 1; fi
+          echo "regressed candidate correctly blocked"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: evalops-gate-report
+          path: evalops-ai/backend/gate-report.json

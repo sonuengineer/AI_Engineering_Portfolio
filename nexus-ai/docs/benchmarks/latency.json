@@ -1,0 +1,18 @@
+{
+  "measured_at": "2026-11-16T17:18:50+00:00",
+  "machine": "Windows 11 / Python 3.12.14",
+  "llm_provider": "local",
+  "embedding_provider": "local",
+  "chat_ask_ms": {
+    "n": 30,
+    "p50": 37.9,
+    "p95": 52.1,
+    "mean": 40.7
+  },
+  "investigation_ms": {
+    "n": 3,
+    "p50": 1330.6,
+    "max": 1420.6
+  },
+  "note": "In-process service calls (no HTTP), local Postgres in Docker, warm caches. With a remote LLM provider, model latency dominates and these numbers do not apply."
+}
